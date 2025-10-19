@@ -136,37 +136,57 @@ def standard_multiply(A: np.ndarray, B: np.ndarray, base_threshold: int = 64) ->
     C = unpad(Cp, n)
     return C
 
+# Step 4: timing helpers and smokes tests
+def time_once(fn, *args, **kwargs) -> float:
+    """
+    Time a single execution of fn(*args, **kwargs) and return elapsed seconds.
+    """
+    t0 = time.perf_counter()
+    _ = fn(*args, **kwargs)
+    t1 = time.perf_counter()
+    return t1 - t0
+
+def time_trials(fn, A: np.ndarray, B: np.ndarray, trials: int = 3, **kwargs) -> float:
+    """
+    Run fn(A, B, **kwargs) several times and return the median elapsed seconds.
+    Also check correctness vs NumPy on the first run.
+    """
+    # correctness check (first run)
+    validate_multiply(A, B, lambda X, Y: fn(X, Y, **kwargs), name = getattr(fn, "__name__", "candidate"))
+
+    times = []
+    # one warm-up (not timed) to charge caches/JIT/etc. (helps with variability)
+    _ = fn(A, B, **kwargs)
+
+    for _i in range(trials):
+        elapsed = time_once(fn, A, B, **kwargs)
+        times.append(elapsed)
+    return float(np.median(times))
+    
+    
+
+
+# Main loop for quick tests
+
 if __name__ == "__main__":
     DEBUG = True
-    n = 5
-    A = np.arange(n*n).reshape(n, n)
-    debug_print("A:\n", A)
 
-    # Pad test
-    target = next_power_of_two(n)
-    Ap = pad_to_power_of_two(A, target)
-    debug_print(f"\nPadded to {target}:\n", Ap)
-
-    # Split-join test (uses a power-of-two size)
-    B = np.arange(16).reshape(4, 4)
-    B11, B12, B21, B22 = split_quadrants(B)
-    B_back = join_quadrants(B11, B12, B21, B22)
-    assert np.array_equal(B, B_back), "Split-join failed"
-    debug_print("\nSplit-join successful.")
-
-    # Step 2 quick tests
-    # Small exact tests (integers)
-    for n in [1, 2, 3, 5, 7]:
-        A = np.random.randint(-3, 4, size=(n, n), dtype=np.int64)
-        B = np.random.randint(-3, 4, size=(n, n), dtype=np.int64)
-        validate_multiply(A, B, naive_multiply, name="naive_multiply")
+    rng = np.random.default_rng(42)
+    def ran_int_matrix(n: int, low: int = -5, high: int = 6, dtype=np.int64):
+        return rng.integers(low, high, size=(n, n), dtype=dtype)
     
-    # Step 3 quick tests
-    # Validate standard_multiply vs NumPy on a mix of sizes, including non-powers of two
-    for n in [2, 3, 5, 7, 8, 16, 31, 45, 50]:
-        A = np.random.randint(-5, 6, size=(n, n), dtype=np.int64)
-        B = np.random.randint(-5, 6, size=(n, n), dtype=np.int64)
-        validate_multiply(A, B, lambda X, Y: standard_multiply(X, Y, base_threshold=16), name="standard D&C multiply")
-    debug_print("\nStandard D&C multiply validated on mixed sizes.")
+    #Choosing modest sizes so the smoke test finishes quickly
+    sizes = [16, 32, 45, 50] # includes a non-power-of-two size (45, 50)
+    base_threshold = 64
 
+    print("\n==== Standard D&C Multiply: Smoke Timing ====")
+    for n in sizes:
+        A = ran_int_matrix(n)
+        B = ran_int_matrix(n)
+        sec = time_trials(standard_multiply, A, B, trials=3, base_threshold=base_threshold)
+        print(f"n={n:4d} median_time={sec*1000:9.3f} ms (trials=3, base_threshold={base_threshold})")
 
+    print("\nNote:")
+    print(" - Validation runs compare results with NumPy each time; failures will raise AssertionError.")
+    print(" - For your assignment tables, switch sizes to around 50, 500, and 1000 (±10%).")
+    print(" - Use more trials (e.g., 5–7) when collecting final numbers for the report.")
