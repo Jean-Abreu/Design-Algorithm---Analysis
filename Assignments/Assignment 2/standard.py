@@ -48,12 +48,48 @@ def join_quadrants(C11: np.ndarray, C12: np.ndarray, C21: np.ndarray, C22: np.nd
     bottom = np.hstack((C21, C22))
     return np.vstack((top, bottom))
 
-# Tiny self-test for helpers
+# Step 2: naive multiply and validator
+
+def naive_multiply(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+    """
+    A straightforward O(n^3) triple-loop multiply.
+    Assumes A and B are square and same shape.
+    """
+    assert is_square_same_shape(A, B), "A and B must be same square shape."
+    n = A.shape[0]
+    C = np.zeros((n, n), dtype=A.dtype)
+    # Use local variables for speed in python loop
+    for i in range(n):
+        Ai = A[i]
+        Ci = C[i]
+        for k in range(n):
+            a_ik = Ai[k]
+            # fused inner loop: Ci[j] += a_ik * B[k][j]
+            Ci += a_ik * B[k]
+    return C
+
+def validate_multiply(A: np.ndarray, B: np.ndarray, fn, name: str = "candidate") -> None:
+    """
+    Compare the output of fn(A, B) to with Numpy's matmul.
+    Raises AssertionError if mismatch is detected.
+    """
+    assert is_square_same_shape(A, B), "A and B must be same square shape."
+    C_ref = A @ B
+    C_out = fn(A, B)
+    if not np.array_equal(C_ref, C_out):
+        # Give a small diff summary to help debug
+        diff = np.abs(C_ref - C_out)
+        max_err = diff.max()
+        where = np.argwhere(diff != 0)
+        debug_print(f"[validate] Mismatch detected. max_err={max_err},first few diffs indices={where[:5]}")
+        raise AssertionError(f"{name} produced incorrect result.")
+    debug_print(f"[validate] {name} multiply NumPy for shape {A.shape}.")
+
 if __name__ == "__main__":
     DEBUG = True
     n = 5
     A = np.arange(n*n).reshape(n, n)
-    debug_print("A: \n", A)
+    debug_print("A:\n", A)
 
     # Pad test
     target = next_power_of_two(n)
@@ -64,5 +100,14 @@ if __name__ == "__main__":
     B = np.arange(16).reshape(4, 4)
     B11, B12, B21, B22 = split_quadrants(B)
     B_back = join_quadrants(B11, B12, B21, B22)
-    assert np.array_equal(B, B_back), "Split/join mismatch"
-    debug_print("\nSplit/join sanity OK.")
+    assert np.array_equal(B, B_back), "Split-join failed"
+    debug_print("\nSplit-join successful.")
+
+    # Step 2 quick tests
+    # Small exact tests (integers)
+    for n in [1, 2, 3, 5, 7]:
+        A = np.random.randint(-3, 4, size=(n, n), dtype=np.int64)
+        B = np.random.randint(-3, 4, size=(n, n), dtype=np.int64)
+        validate_multiply(A, B, naive_multiply, name="naive_multiply")
+
+
