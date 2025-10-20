@@ -81,6 +81,56 @@ def validate_multiply(A: np.ndarray, B: np.ndarray, fn, name: str = "candidate")
         raise AssertionError(f"{name} multiply produced incorrect result.")
     debug_print(f"[validate] {name} multiply matches NumPy for shape {A.shape}.")
 
+# Step 3: Strassen with padding and base-threshold
+def _strassen_recursive(A: np.ndarray, B: np.ndarray, base_threshold: int = 64) -> np.ndarray:
+    """
+    Strassen's recursive multiply on power-of-two shapes.
+    Assumes A and B are square, same shape, and n is a power of two.
+    """
+    n = A.shape[0]
+    if n <= base_threshold:
+        return naive_multiply(A, B)
+    
+    A11, A12, A21, A22 = split_quadrants(A)
+    B11, B12, B21, B22 = split_quadrants(B)
+
+    # Strassen's 7 products
+    M1 = _strassen_recursive(A11 + A22, B11 + B22, base_threshold)
+    M2 = _strassen_recursive(A21 + A22, B11, base_threshold)
+    M3 = _strassen_recursive(A11, B12 - B22, base_threshold)
+    M4 = _strassen_recursive(A22, B21 - B11, base_threshold)
+    M5 = _strassen_recursive(A11 + A12, B22, base_threshold)
+    M6 = _strassen_recursive(A21 - A11, B11 + B12, base_threshold)
+    M7 = _strassen_recursive(A12 - A22, B21 + B22, base_threshold)
+
+    # Combine into C blocks
+    C11 = M1 + M4 - M5 + M7
+    C12 = M3 + M5
+    C21 = M2 + M4
+    C22 = M1 - M2 + M3 + M6
+
+    return join_quadrants(C11, C12, C21, C22)
+
+def strassen_multiply(A: np.ndarray, B: np.ndarray, base_threshold: int = 64) -> np.ndarray:
+    """
+    Public entry: Strassen multiply with automatic padding for arbitary n.
+    Works for any square n x n matrices A and B of the same shape.
+    """
+    assert is_square_same_shape(A, B), "A and B must be same square shape."
+    n = A.shape[0]
+    # need to be generous with dtype to avoid overflow on small random ints
+    dtype = np.result_type(A.dtype, B.dtype, np.int64)
+    A = A.astype(dtype, copy=False)
+    B = B.astype(dtype, copy=False)
+
+    target = next_power_of_two(n)
+    Ap = pad_to_power_of_two(A, target)
+    Bp = pad_to_power_of_two(B, target)
+
+    Cp = _strassen_recursive(Ap, Bp, base_threshold=base_threshold)
+    C = unpad(Cp, n)
+    return C
+
 # Tiny self-test for helpers
 if __name__ == "__main__":
     DEBUG = True
@@ -106,3 +156,10 @@ if __name__ == "__main__":
         B = np.random.randint(-3, 4, size=(n, n), dtype=np.int64)
         validate_multiply(A, B, naive_multiply, name="naive")
     debug_print("\nNaive multiply validated on small tests.")
+
+    # Step 3 quick tests
+    for n in [2, 3, 5, 7, 8, 16, 31, 45, 50]:
+        A = np.random.randint(-5, 6, size=(n, n), dtype=np.int64)
+        B = np.random.randint(-5, 6, size=(n, n), dtype=np.int64)
+        validate_multiply(A, B, lambda X, Y: strassen_multiply(X, Y, base_threshold=64), name="strassen")
+    debug_print("\nStrassen multiply validated on mixed sizes.")
