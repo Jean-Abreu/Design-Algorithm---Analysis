@@ -93,7 +93,7 @@ def _dc_recursive(A: np.ndarray, B: np.ndarray, base_threshold: int = 64) -> np.
     """
     n = A.shape[0]
     if n <= base_threshold:
-        return naive_multiply(A, B)
+        return A @ B
     
     A11, A12, A21, A22 = split_quadrants(A)
     B11, B12, B21, B22 = split_quadrants(B)
@@ -123,7 +123,7 @@ def standard_multiply(A: np.ndarray, B: np.ndarray, base_threshold: int = 64) ->
     assert is_square_same_shape(A, B), "A and B must be the same square shape."
     n = A.shape[0]
     # Choose dtype that avoids overflow on small random ints
-    dtype = np.result_type(A.dtype, B.dtype, np.int64)
+    dtype = np.result_type(A.dtype, B.dtype, np.int32)
     A = A.astype(dtype, copy=False)
     B = B.astype(dtype, copy=False)
 

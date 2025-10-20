@@ -84,7 +84,7 @@ def run_benchmarks(
             rows.append([case_name, n, "Strassen", f"{t_strassen:.3f}"])
 
     # write CSV
-    with open(csv_path, "w", newline="") as f:
+    with open(csv_path, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
         writer.writerow(["Case", "n", "Method", "MedianTime_ms"])
         writer.writerows(rows)

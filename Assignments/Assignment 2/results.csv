@@ -1,0 +1,19 @@
+﻿Case,n,Method,MedianTime_ms
+Case 1 (≈50),48,Standard,0.197
+Case 1 (≈50),48,Strassen,0.159
+Case 1 (≈50),50,Standard,0.182
+Case 1 (≈50),50,Strassen,0.159
+Case 1 (≈50),56,Standard,0.299
+Case 1 (≈50),56,Strassen,0.190
+Case 2 (≈500),480,Standard,198.748
+Case 2 (≈500),480,Strassen,186.590
+Case 2 (≈500),512,Standard,194.393
+Case 2 (≈500),512,Strassen,168.849
+Case 2 (≈500),544,Standard,1606.145
+Case 2 (≈500),544,Strassen,1262.051
+Case 3 (≈1000),960,Standard,1600.903
+Case 3 (≈1000),960,Strassen,1246.063
+Case 3 (≈1000),1000,Standard,1605.093
+Case 3 (≈1000),1000,Strassen,1302.583
+Case 3 (≈1000),1024,Standard,1588.615
+Case 3 (≈1000),1024,Strassen,1226.351
