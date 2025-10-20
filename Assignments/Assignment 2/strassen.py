@@ -131,35 +131,50 @@ def strassen_multiply(A: np.ndarray, B: np.ndarray, base_threshold: int = 64) ->
     C = unpad(Cp, n)
     return C
 
+# Step 4: timing helpers and smoke tests
+def time_once(fn, *args, **kwargs) -> float:
+    """Time a single call to fn(*args, **kwargs) and return elapsed seconds."""
+    t0 = time.perf_counter()
+    _ = fn(*args, **kwargs)
+    t1 = time.perf_counter()
+    return t1 - t0
+
+def time_trials(fn, A: np.ndarray, B: np.ndarray, trials: int = 3, **kwargs) -> float:
+    """
+    Run fn(A,B,**kwargs) several times and return the median elapsed seconds.
+    Also checks correctness vs NumPy on the first run.
+    """
+    # correctness check (first run)
+    validate_multiply(A, B, lambda X, Y: fn(X, Y, **kwargs), name=getattr(fn, "__name__", "candidate"))
+
+    times = []
+    _ = fn(A, B, **kwargs)  # warm-up (not timed)
+
+    for _i in range(trials):
+        elapsed = time_once(fn, A, B, **kwargs)
+        times.append(elapsed)
+    return float(np.median(times))
+
 # Tiny self-test for helpers
 if __name__ == "__main__":
     DEBUG = True
-    n = 5
-    A = np.arange(n*n).reshape(n, n)
-    debug_print("A=\n", A)
+    
+    rng = np.random.default_rng(123)
 
-    # Pad test
-    target = next_power_of_two(n)
-    Ap = pad_to_power_of_two(A, target)
-    debug_print(f"\nPadded to {target}:\n", Ap)
+    def rand_int_matrix(n: int, low: int = -5, high: int = 6, dtype=np.int64): 
+        return rng.integers(low, high, size=(n, n), dtype=dtype)
 
-    # Split-join test
-    B = np.arange(16).reshape(4,4)
-    B11, B12, B21, B22 = split_quadrants(B)
-    B_back = join_quadrants(B11, B12, B21, B22)
-    assert np.array_equal(B, B_back), "Split-join failed"
-    debug_print("\nSplit-join successful on B=\n", B)  
+    sizes = [16, 32, 45, 50]
+    base_threshold = 64
 
-    # Step 2 quick tests
-    for n in [1, 2, 3, 5, 7]:
-        A = np.random.randint(-3, 4, size=(n, n), dtype=np.int64)
-        B = np.random.randint(-3, 4, size=(n, n), dtype=np.int64)
-        validate_multiply(A, B, naive_multiply, name="naive")
-    debug_print("\nNaive multiply validated on small tests.")
+    print("\n=== Strassen Multiply: Smoke Timing ===")
+    for n in sizes:
+        A = rand_int_matrix(n)
+        B = rand_int_matrix(n)
+        sec = time_trials(strassen_multiply, A, B, trials=3, base_threshold=base_threshold)
+        print(f"n={n:4d}  median_time={sec*1000:9.3f} ms  (trials=3, base_threshold={base_threshold})")
 
-    # Step 3 quick tests
-    for n in [2, 3, 5, 7, 8, 16, 31, 45, 50]:
-        A = np.random.randint(-5, 6, size=(n, n), dtype=np.int64)
-        B = np.random.randint(-5, 6, size=(n, n), dtype=np.int64)
-        validate_multiply(A, B, lambda X, Y: strassen_multiply(X, Y, base_threshold=64), name="strassen")
-    debug_print("\nStrassen multiply validated on mixed sizes.")
+    print("\nNotes:")
+    print(" - Each run is validated against NumPy; any mismatch raises AssertionError.")
+    print(" - For assignment tables, test around n=50, 500, 1000 (±10%).")
+    print(" - Consider increasing trials (5–7) and adjusting base_threshold for large n.")
